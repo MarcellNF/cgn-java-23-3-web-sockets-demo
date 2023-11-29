@@ -1,11 +1,14 @@
 package de.neuefische.backend;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -13,9 +16,11 @@ import java.util.Set;
 public class ChatService extends TextWebSocketHandler {
 
     private final Set<WebSocketSession> sessions;
+    private final ObjectMapper objectMapper;
 
     public ChatService() {
         sessions = new HashSet<>();
+        objectMapper = new ObjectMapper();
     }
 
     @Override
@@ -27,8 +32,12 @@ public class ChatService extends TextWebSocketHandler {
     @Override
     public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
         super.handleMessage(session, message);
+        CustomTextMessage customTextMessage = new CustomTextMessage((String) message.getPayload(), Instant.now().toString());
+        TextMessage textMessageToSend = new TextMessage(objectMapper.writeValueAsString(customTextMessage));
         for(WebSocketSession s : sessions){
-            s.sendMessage(message);
+            if (!s.equals(session)) {
+                s.sendMessage(textMessageToSend);
+            }
         }
     }
 
@@ -37,4 +46,10 @@ public class ChatService extends TextWebSocketHandler {
         super.afterConnectionClosed(session, status);
         sessions.remove(session);
     }
+}
+
+record CustomTextMessage(
+        String message,
+        String timestamp
+) {
 }
